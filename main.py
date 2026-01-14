@@ -7,38 +7,24 @@
 import os
 import asyncio
 from telethon import TelegramClient, events
-# -----------------------------------------------------
-# VERSAO WEB
-# -----------------------------------------------------
 from telethon.sessions import StringSession
 
 SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING")
  
-client = TelegramClient(
-    StringSession(SESSION_STRING),
-    API_ID,
-    API_HASH
-)
-# -----------------------------------------------
-
-MODE = os.getenv("MODE", "BOT") #versão web
-
 # -------------------------------------------------
 # Ambiente local → carrega .env (se existir)
 # Ambiente web  → ignora .env e usa env vars
 # -------------------------------------------------
 try:
     from dotenv import load_dotenv
-
     if os.path.exists(".env"):
         load_dotenv()
         print("[ENV] .env carregado (execução local)")
     else:
-        print("[ENV] .env não encontrado (execução web)")
+        print("[ENV] execução web (Railway)")
 except ImportError:
     # python-dotenv não instalado (Railway/GitHub)
     print("[ENV] python-dotenv ausente (execução web)")
-    pass
 
 # -------------------------------------------------
 # Variáveis de ambiente (obrigatórias)
@@ -47,8 +33,9 @@ API_ID = int(os.environ["API_ID"])
 API_HASH = os.environ["API_HASH"]
 SOURCE_CHAT_ID = int(os.environ["SOURCE_CHAT_ID"])
 TARGET_CHAT_ID = int(os.environ["TARGET_CHAT_ID"])
-#BOT_TOKEN = os.environ["BOT_TOKEN"]
 SESSION_STRING = os.environ["TELEGRAM_SESSION_STRING"]
+
+MODE = os.getenv("MODE", "BOT") #versão web
 
 # Nome da sessão (opcional)
 # SESSION_NAME = os.environ.get("SESSION_NAME", "session_forwarder") = usado na versão local
@@ -59,8 +46,18 @@ SESSION_NAME = "/app/session_forwarder"
 # Cliente Telegram
 # -------------------------------------------------
 # client = TelegramClient(SESSION_NAME, API_ID, API_HASH).start(bot_token=BOT_TOKEN) = usado na versão local
+#client = TelegramClient(
+#    SESSION_NAME,
+#    API_ID,
+#    API_HASH
+#)
+
+
+# -------------------------------------------------
+# Cliente Telegram
+# -------------------------------------------------
 client = TelegramClient(
-    SESSION_NAME,
+    StringSession(SESSION_STRING),
     API_ID,
     API_HASH
 )
@@ -81,7 +78,7 @@ async def forward_message(event):
         else:
             await client.send_message(
                 TARGET_CHAT_ID,
-                event.message.text
+                event.message.text or ""
             )
 
         print("Mensagem encaminhada")
@@ -104,13 +101,13 @@ async def main():
     if MODE == "LOGIN":
         print("Modo LOGIN: gerando sessão...")
         await client.start()
-        print("Sessão criada com sucesso.")
+        print("Sessão válida criada com sucesso.")
         return
 
-    print("Modo BOT: rodando normalmente...")
+    print("Modo BOT: iniciado...")
     await client.start()
     await client.run_until_disconnected()
-import asyncio
+#import asyncio
 
 # -----------------------------------------------
 
