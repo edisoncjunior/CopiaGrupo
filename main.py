@@ -31,6 +31,7 @@ API_ID = int(os.environ["API_ID"])
 API_HASH = os.environ["API_HASH"]
 SOURCE_CHAT_ID = int(os.environ["SOURCE_CHAT_ID"])
 TARGET_CHAT_ID = int(os.environ["TARGET_CHAT_ID"])
+BOT_TOKEN = os.environ["BOT_TOKEN"]
 
 # Nome da sessão (opcional)
 SESSION_NAME = os.environ.get("SESSION_NAME", "session_forwarder")
@@ -38,7 +39,7 @@ SESSION_NAME = os.environ.get("SESSION_NAME", "session_forwarder")
 # -------------------------------------------------
 # Cliente Telegram
 # -------------------------------------------------
-client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+client = TelegramClient(SESSION_NAME, API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 # -------------------------------------------------
 # Listener de mensagens
@@ -67,7 +68,7 @@ async def forward_message(event):
 # Execução principal
 # -------------------------------------------------
 async def main():
-    print("Bot de encaminhamento iniciado")
+    print("Bot iniciado Railway BOT")
     await client.start()
     await client.run_until_disconnected()
 
