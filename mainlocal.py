@@ -7,21 +7,6 @@
 import os
 import asyncio
 from telethon import TelegramClient, events
-# -----------------------------------------------------
-# VERSAO WEB
-# -----------------------------------------------------
-from telethon.sessions import StringSession
-
-SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING")
- 
-client = TelegramClient(
-    StringSession(SESSION_STRING),
-    API_ID,
-    API_HASH
-)
-# -----------------------------------------------
-
-MODE = os.getenv("MODE", "BOT") #versão web
 
 # -------------------------------------------------
 # Ambiente local → carrega .env (se existir)
@@ -49,20 +34,12 @@ TARGET_CHAT_ID = int(os.environ["TARGET_CHAT_ID"])
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
 # Nome da sessão (opcional)
-# SESSION_NAME = os.environ.get("SESSION_NAME", "session_forwarder") = usado na versão local
-
-SESSION_NAME = "/app/session_forwarder"
+SESSION_NAME = os.environ.get("SESSION_NAME", "session_forwarder")
 
 # -------------------------------------------------
 # Cliente Telegram
 # -------------------------------------------------
-# client = TelegramClient(SESSION_NAME, API_ID, API_HASH).start(bot_token=BOT_TOKEN) = usado na versão local
-client = TelegramClient(
-    SESSION_NAME,
-    API_ID,
-    API_HASH
-)
-
+client = TelegramClient(SESSION_NAME, API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 # -------------------------------------------------
 # Listener de mensagens
@@ -88,29 +65,12 @@ async def forward_message(event):
         print(f"Erro ao encaminhar mensagem: {e}")
 
 # -------------------------------------------------
-# Execução principal (versão local)
-# -------------------------------------------------
-# async def main():
-#    print("Bot iniciado Railway BOT")
-#    await client.start()
-#    await client.run_until_disconnected()
-
-# -------------------------------------------------
-# Execução principal (versão web)
+# Execução principal
 # -------------------------------------------------
 async def main():
-    if MODE == "LOGIN":
-        print("Modo LOGIN: gerando sessão...")
-        await client.start()
-        print("Sessão criada com sucesso.")
-        return
-
-    print("Modo BOT: rodando normalmente...")
+    print("Bot iniciado Railway BOT")
     await client.start()
     await client.run_until_disconnected()
-import asyncio
-
-# -----------------------------------------------
 
 if __name__ == "__main__":
     asyncio.run(main())
