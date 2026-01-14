@@ -1,4 +1,4 @@
-﻿# VERSAO 1 - FUNCIONA LOCAL
+﻿# VERSAO 1 - FUNCIONA LOCAL e WEB
 
 
 #!/usr/bin/env python3
