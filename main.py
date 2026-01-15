@@ -1,4 +1,4 @@
-﻿# VERSAO 1 - FUNCIONA LOCAL e WEB
+﻿# VERSAO 1 - FUNCIONA LOCAL e WEB - Com LOG
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -187,7 +187,7 @@ async def daily_log_scheduler():
     while True:
         now = datetime.now(tz)
 
-        send_time = now.replace(hour=21, minute=00, second=0, microsecond=0)
+        send_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
 
         if now >= send_time:
             send_time += timedelta(days=1)
