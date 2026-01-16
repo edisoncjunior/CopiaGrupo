@@ -1,15 +1,17 @@
-﻿# VERSAO 1 - FUNCIONA LOCAL e WEB - Com LOG
+﻿# VERSAO 1 - FUNCIONA LOCAL e WEB - Com LOG e envio diário as 9h e 21h
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import os
+import re
 import asyncio
+from datetime import datetime, timezone, timedelta
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-import re
-from datetime import datetime, timezone, timedelta
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING")
  
@@ -50,42 +52,11 @@ client = TelegramClient(
     API_ID,
     API_HASH
 )
-
-
-# -------------------------------------------------
-# Listener de mensagens
-# -------------------------------------------------
-#@client.on(events.NewMessage(chats=SOURCE_CHAT_ID))
-#async def forward_message(event):
-#    try:
-#        if event.message.media:
-#            await client.send_file(
-#                TARGET_CHAT_ID,
-#                event.message.media,
-#                caption=event.message.text
-#            )
-#        else:
-#            await client.send_message(
-#                TARGET_CHAT_ID,
-#                event.message.text or ""
-#            )
-#
-#        print("Mensagem encaminhada")
-#
-#    except Exception as e:
-#        print(f"Erro ao encaminhar mensagem: {e}")
-
-
-#---------------------------------------------------------
-# Esta função interpreta os padrões de mensagem
-# --------------------------------------------------------
-
+# ---------------------------------------------------
+# Extrai dados estruturados da mensagem do Telegram.
+# Retorna dict ou None se não casar com o padrão.
+# ---------------------------------------------------
 def parse_signal_message(text: str):
-    """
-    Extrai dados estruturados da mensagem do Telegram.
-    Retorna dict ou None se não casar com o padrão.
-    """
-
     # Normaliza texto
     text = text.strip().replace("\r", "")
 
@@ -115,114 +86,53 @@ def parse_signal_message(text: str):
         "timeframe": timeframe,
         "price": price
     }
-#---------------------------------------------------------
-# Esta função grava log
-# --------------------------------------------------------
-def get_daily_log_filename(date=None):
-    tz = timezone(timedelta(hours=-3))
-    if date is None:
-        date = datetime.now(tz)
 
-    day_str = date.strftime("%Y-%m-%d")
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_dir, f"telegram_signals_{day_str}.tsv")
+# -------------------------------------------------------------------------
+# Função que retorna a data operacional considerando início às 21h (SP).
+# -------------------------------------------------------------------------
 
+def get_operational_date(now):
+
+    if now.hour < 21:
+        return (now.date() - timedelta(days=1))
+    return now.date()
+
+# -------------------------------------------------
+# Função para gravar o log tabulado
+# -------------------------------------------------
 def write_log(data: dict):
-    tz = timezone(timedelta(hours=-3))
-    now = datetime.now(tz)
+    os.makedirs(LOG_DIR, exist_ok=True)
 
-    log_file = get_daily_log_filename()
+    tz_brasilia = timezone(timedelta(hours=-3))
+    now = datetime.now(tz_brasilia)
+
+    operational_date = get_operational_date(now)
+    file_name = f"log_{operational_date.isoformat()}.txt"
+    log_path = os.path.join(LOG_DIR, file_name)
 
     header = "Data\tHora\tExchange\tMoeda\tSinal\tGrafico\tPreco\n"
-    file_exists = os.path.exists(log_file)
+    file_exists = os.path.exists(log_path)
 
-    try:
-        with open(log_file, "a", encoding="utf-8") as f:
-            if not file_exists:
-                f.write(header)
+    data_str = now.strftime("%d/%m/%Y")
+    hora_str = now.strftime("%H:%M:%S")
 
-            line = (
-                f"{now.strftime('%Y-%m-%d')}\t"
-                f"{now.strftime('%H:%M:%S')}\t"
-                f"{data['exchange']}\t"
-                f"{data['symbol']}\t"
-                f"{data['signal']}\t"
-                f"{data['timeframe']}\t"
-                f"{data['price']}\n"
-            )
-            f.write(line)
+    with open(log_path, "a", encoding="utf-8") as f:
+        if not file_exists:
+            f.write(header)
 
-    except Exception as e:
-        print(f"[ERRO LOG] Falha ao gravar arquivo {log_file}: {e}")
-
-async def send_daily_log():
-    tz = timezone(timedelta(hours=-3))
-    today = datetime.now(tz)
-
-    log_file = get_daily_log_filename(today)
-
-    if not os.path.exists(log_file):
-        await client.send_message(
-            TARGET_CHAT_ID,
-            f"📄 Log diário {today.strftime('%Y-%m-%d')}:\nNenhum sinal registrado."
+        f.write(
+            f"{data_str}\t"
+            f"{hora_str}\t"
+            f"{data['exchange']}\t"
+            f"{data['symbol']}\t"
+            f"{data['signal']}\t"
+            f"{data['timeframe']}\t"
+            f"{data['price']}\n"
         )
-        return
-
-    try:
-        await client.send_file(
-            TARGET_CHAT_ID,
-            log_file,
-            caption=f"📄 Log diário {today.strftime('%Y-%m-%d')}"
-        )
-
-        os.remove(log_file)
-        print(f"[LOG] Arquivo enviado e removido: {log_file}")
-
-    except Exception as e:
-        print(f"[ERRO] Falha ao enviar log diário: {e}")
-
-async def daily_log_scheduler():
-    tz = timezone(timedelta(hours=-3))
-
-    while True:
-        now = datetime.now(tz)
-
-        send_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
-
-        if now >= send_time:
-            send_time += timedelta(days=1)
-
-        sleep_seconds = (send_time - now).total_seconds()
-
-        print(
-            f"[SCHEDULER] Próximo envio do log em "
-            f"{int(sleep_seconds // 3600)}h "
-            f"{int((sleep_seconds % 3600) // 60)}m"
-        )
-
-        await asyncio.sleep(sleep_seconds)
-
-        await send_daily_log()
 
 # -------------------------------------------------
-# Execução principal (versão final)
+# Listener de mensagens
 # -------------------------------------------------
-async def main():
-    if MODE == "LOGIN":
-        print("Modo LOGIN: gerando sessão...")
-        await client.start()
-        print("Sessão válida criada com sucesso.")
-        return
-
-    print("Modo BOT: iniciado...")
-    await client.start()
-    asyncio.create_task(daily_log_scheduler()) # ▶ inicia scheduler diário
-    await client.run_until_disconnected()
-
-#---------------------------------------------------------
-# Nova função 
-# --------------------------------------------------------
-
 @client.on(events.NewMessage(chats=SOURCE_CHAT_ID))
 async def forward_message(event):
     try:
@@ -252,7 +162,66 @@ async def forward_message(event):
     except Exception as e:
         print(f"Erro ao processar mensagem: {e}")
 
+# -------------------------------------------------
+# Função para enviar o log para o Telegram
+# -------------------------------------------------
+async def send_daily_log():
+    tz_brasilia = timezone(timedelta(hours=-3))
+    now = datetime.now(tz_brasilia)
 
+    operational_date = get_operational_date(now)
+    file_name = f"log_{operational_date.isoformat()}.txt"
+    log_path = os.path.join(LOG_DIR, file_name)
+
+    if not os.path.exists(log_path):
+        print("[LOG] Nenhum arquivo para enviar")
+        return
+
+    caption = (
+        f"📊 Log diário\n"
+        f"Data operacional: {operational_date.strftime('%d/%m/%Y')}\n"
+        f"Horário envio: {now.strftime('%H:%M')}"
+    )
+
+    await client.send_file(
+        TARGET_CHAT_ID,
+        log_path,
+        caption=caption
+    )
+
+    print("[LOG] Arquivo enviado ao Telegram")
+
+# -------------------------------------------------
+# Scheduler assíncrono (09h e 21h)
+# -------------------------------------------------
+async def scheduler():
+    tz_brasilia = timezone(timedelta(hours=-3))
+
+    while True:
+        now = datetime.now(tz_brasilia)
+        current_time = now.strftime("%H:%M")
+
+        if current_time in ("09:00", "21:00"):
+            print(f"[SCHEDULER] Envio programado {current_time}")
+            await send_daily_log()
+            await asyncio.sleep(60)  # evita envio duplicado no mesmo minuto
+
+        await asyncio.sleep(20)
+
+# -------------------------------------------------
+# Execução principal (versão final)
+# -------------------------------------------------
+async def main():
+    if MODE == "LOGIN":
+        print("Modo LOGIN: gerando sessão...")
+        await client.start()
+        print("Sessão válida criada com sucesso.")
+        return
+
+    print("Modo BOT: iniciado...")
+    await client.start()
+    asyncio.create_task(scheduler())
+    await client.run_until_disconnected()
 
 if __name__ == "__main__":
     asyncio.run(main())
