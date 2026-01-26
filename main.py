@@ -14,6 +14,15 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING")
+
+# -------------------------------------------------
+# Moedas permitidas para alerta
+# -------------------------------------------------
+ALLOWED_SYMBOLS = {
+    "ASTERUSDT", "BEATUSDT", "CHZUSDT", "DOGEUSDT", "ENAUSDT", "FHEUSDT", "FOLKSUSDT", "HUSDT",
+    "JASMYUSDT", "LITUSDT", "NIGHTUSDT", "PIPPINUSDT", "POLUSDT", "STRKUSDT", "UNIUSDT", "WLFIUSDT", "XRPUSDT"
+}
+
  
 # -------------------------------------------------
 # Ambiente local → carrega .env (se existir)
@@ -144,6 +153,15 @@ async def forward_message(event):
             write_log(parsed)
             print(f"[LOG] Registrado: {parsed}")
 
+            # -------- FILTRO DE MOEDAS --------
+            if parsed["symbol"] not in ALLOWED_SYMBOLS:
+                print(f"[SKIP] Moeda ignorada: {parsed['symbol']}")
+                return  # não envia para o Telegram
+
+        else:
+            # mensagem não é sinal → ignora encaminhamento
+            return
+
         # -------- FORWARD --------
         if event.message.media:
             await client.send_file(
@@ -157,7 +175,7 @@ async def forward_message(event):
                 text
             )
 
-        print("Mensagem encaminhada")
+        print(f"[FORWARD] Enviado: {parsed['symbol']}")
 
     except Exception as e:
         print(f"Erro ao processar mensagem: {e}")
