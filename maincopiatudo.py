@@ -1,6 +1,4 @@
-﻿# VERSAO 1 Main CopiaGrupo - FUNCIONA LOCAL e WEB - 
-# Com LOG e envio diário as 9h e 21h
-# Bruno Aguiar - MEXC com Taxa Zero
+﻿# VERSAO 1 - FUNCIONA LOCAL e WEB - Com LOG e envio diário as 9h e 21h
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -16,15 +14,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING")
-
-# -------------------------------------------------
-# Moedas permitidas para alerta
-# -------------------------------------------------
-ALLOWED_SYMBOLS = {
-#Lista dos ativos do Bruno Aguiar na MEXC com taxa zero:
-    "BCHUSDT", "BNBUSDT", "CHZUSDT", "DOGEUSDT", "ENAUSDT", "ETHUSDT",
-    "JASMYUSDT", "SOLUSDT", "UNIUSDT", "XMRUSDT", "XRPUSDT"
-}
  
 # -------------------------------------------------
 # Ambiente local → carrega .env (se existir)
@@ -155,15 +144,6 @@ async def forward_message(event):
             write_log(parsed)
             print(f"[LOG] Registrado: {parsed}")
 
-            # -------- FILTRO DE MOEDAS --------
-            if parsed["symbol"] not in ALLOWED_SYMBOLS:
-                print(f"[SKIP] Moeda ignorada: {parsed['symbol']}")
-                return  # não envia para o Telegram
-
-        else:
-            # mensagem não é sinal → ignora encaminhamento
-            return
-
         # -------- FORWARD --------
         if event.message.media:
             await client.send_file(
@@ -177,7 +157,7 @@ async def forward_message(event):
                 text
             )
 
-        print(f"[FORWARD] Enviado: {parsed['symbol']}")
+        print("Mensagem encaminhada")
 
     except Exception as e:
         print(f"Erro ao processar mensagem: {e}")
