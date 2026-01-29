@@ -1,5 +1,6 @@
 ﻿# VERSAO 1 Main CopiaGrupo - FUNCIONA LOCAL e WEB - 
-# Com LOG e envio diário as 9h e 21h
+# Com LOG e envio diário as 9h e 21h 
+# novo main envia log meia noite (apenas) para corrigir erro no log q envia apenas as 9h
 # Bruno Aguiar - MEXC com Taxa Zero
 
 #!/usr/bin/env python3
@@ -15,7 +16,8 @@ from telethon.sessions import StringSession
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 
-SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING")
+#SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING")
+TZ_BRASILIA = timezone(timedelta(hours=-3))
 
 # -------------------------------------------------
 # Moedas permitidas para alerta
@@ -50,10 +52,7 @@ SOURCE_CHAT_ID = int(os.environ["SOURCE_CHAT_ID"])
 TARGET_CHAT_ID = int(os.environ["TARGET_CHAT_ID"])
 SESSION_STRING = os.environ["TELEGRAM_SESSION_STRING"]
 
-MODE = os.getenv("MODE", "BOT") #versão web
-
-# Nome da sessão (opcional)
-SESSION_NAME = "/app/session_forwarder"
+# MODE = os.getenv("MODE", "BOT") #versão web
 
 # -------------------------------------------------
 # Cliente Telegram
@@ -103,9 +102,6 @@ def parse_signal_message(text: str):
 # -------------------------------------------------------------------------
 
 def get_operational_date(now):
-
-    if now.hour < 21:
-        return (now.date() - timedelta(days=1))
     return now.date()
 
 # -------------------------------------------------
@@ -113,9 +109,7 @@ def get_operational_date(now):
 # -------------------------------------------------
 def write_log(data: dict):
     os.makedirs(LOG_DIR, exist_ok=True)
-
-    tz_brasilia = timezone(timedelta(hours=-3))
-    now = datetime.now(tz_brasilia)
+    now = datetime.now(TZ_BRASILIA)
 
     operational_date = get_operational_date(now)
     file_name = f"log_{operational_date.isoformat()}.txt"
@@ -186,8 +180,7 @@ async def forward_message(event):
 # Função para enviar o log para o Telegram
 # -------------------------------------------------
 async def send_daily_log():
-    tz_brasilia = timezone(timedelta(hours=-3))
-    now = datetime.now(tz_brasilia)
+    now = datetime.now(TZ_BRASILIA)
 
     operational_date = get_operational_date(now)
     file_name = f"log_{operational_date.isoformat()}.txt"
@@ -199,7 +192,7 @@ async def send_daily_log():
 
     caption = (
         f"📊 Log diário\n"
-        f"Data operacional: {operational_date.strftime('%d/%m/%Y')}\n"
+        f"Data: {operational_date.strftime('%d/%m/%Y')}\n"
         f"Horário envio: {now.strftime('%H:%M')}"
     )
 
@@ -215,15 +208,16 @@ async def send_daily_log():
 # Scheduler assíncrono (09h e 21h)
 # -------------------------------------------------
 async def scheduler():
-    tz_brasilia = timezone(timedelta(hours=-3))
-
     while True:
-        now = datetime.now(tz_brasilia)
+        now = datetime.now(TZ_BRASILIA)
         current_time = now.strftime("%H:%M")
 
-        if current_time in ("09:00", "21:00"):
+        global last_sent_date
+
+        if current_time == "00:00" and last_sent_date != now.date():
             print(f"[SCHEDULER] Envio programado {current_time}")
             await send_daily_log()
+            last_sent_date = now.date()
             await asyncio.sleep(60)  # evita envio duplicado no mesmo minuto
 
         await asyncio.sleep(20)
@@ -232,11 +226,11 @@ async def scheduler():
 # Execução principal (versão final)
 # -------------------------------------------------
 async def main():
-    if MODE == "LOGIN":
-        print("Modo LOGIN: gerando sessão...")
-        await client.start()
-        print("Sessão válida criada com sucesso.")
-        return
+#    if MODE == "LOGIN":
+#        print("Modo LOGIN: gerando sessão...")
+#        await client.start()
+#        print("Sessão válida criada com sucesso.")
+#        return
 
     print("Modo BOT: iniciado...")
     await client.start()
