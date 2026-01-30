@@ -217,7 +217,7 @@ async def scheduler():
         now = datetime.now(TZ_BRASILIA)
 
         if now.hour == 8 and now.minute == 0 and last_sent_date != now.date():
-            print(f"[SCHEDULER] Envio enviado {current_time}")
+            print(f"[SCHEDULER] Envio enviado {now}")
             await send_daily_log()
             last_sent_date = now.date()
             await asyncio.sleep(70)  # evita envio duplicado no mesmo minuto
