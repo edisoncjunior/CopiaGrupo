@@ -53,8 +53,6 @@ SOURCE_CHAT_ID = int(os.environ["SOURCE_CHAT_ID"])
 TARGET_CHAT_ID = int(os.environ["TARGET_CHAT_ID"])
 SESSION_STRING = os.environ["TELEGRAM_SESSION_STRING"]
 
-# MODE = os.getenv("MODE", "BOT") #versão web
-
 # -------------------------------------------------
 # Cliente Telegram
 # -------------------------------------------------
@@ -216,7 +214,7 @@ async def scheduler():
     while True:
         now = datetime.now(TZ_BRASILIA)
 # and last_sent_date != now.date():
-        if now.hour == 14 and now.minute == 0:
+        if now.hour == 18 and now.minute == 0:
             print(f"[SCHEDULER] Envio enviado {now}")
             await send_daily_log()
             last_sent_date = now.date()
@@ -228,12 +226,6 @@ async def scheduler():
 # Execução principal (versão final)
 # -------------------------------------------------
 async def main():
-#    if MODE == "LOGIN":
-#        print("Modo LOGIN: gerando sessão...")
-#        await client.start()
-#        print("Sessão válida criada com sucesso.")
-#        return
-
     print("Modo BOT: iniciado...")
     await client.start()
     asyncio.create_task(scheduler())
