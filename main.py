@@ -216,7 +216,7 @@ async def scheduler():
     while True:
         now = datetime.now(TZ_BRASILIA)
 
-        if now.hour == 0 and now.minute == 0 and last_sent_date != now.date():
+        if now.hour == 8 and now.minute == 0 and last_sent_date != now.date():
             print(f"[SCHEDULER] Envio enviado {current_time}")
             await send_daily_log()
             last_sent_date = now.date()
