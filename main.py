@@ -18,6 +18,7 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 
 #SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING")
 TZ_BRASILIA = timezone(timedelta(hours=-3))
+last_sent_date = None
 
 # -------------------------------------------------
 # Moedas permitidas para alerta
@@ -98,7 +99,7 @@ def parse_signal_message(text: str):
     }
 
 # -------------------------------------------------------------------------
-# Função que retorna a data operacional considerando início às 21h (SP).
+# Função que retorna a data
 # -------------------------------------------------------------------------
 
 def get_operational_date(now):
@@ -182,17 +183,18 @@ async def forward_message(event):
 async def send_daily_log():
     now = datetime.now(TZ_BRASILIA)
 
-    operational_date = get_operational_date(now)
-    file_name = f"log_{operational_date.isoformat()}.txt"
+    log_date = now.date() - timedelta(days=1)
+
+    file_name = f"log_{log_date.isoformat()}.txt"
     log_path = os.path.join(LOG_DIR, file_name)
 
     if not os.path.exists(log_path):
-        print("[LOG] Nenhum arquivo para enviar")
+        print(f"[LOG] Nenhum arquivo para enviar ({file_name})")
         return
 
     caption = (
         f"📊 Log diário\n"
-        f"Data: {operational_date.strftime('%d/%m/%Y')}\n"
+        f"Data: {log_date.strftime('%d/%m/%Y')}\n"
         f"Horário envio: {now.strftime('%H:%M')}"
     )
 
@@ -204,23 +206,23 @@ async def send_daily_log():
 
     print("[LOG] Arquivo enviado ao Telegram")
 
+
 # -------------------------------------------------
 # Scheduler assíncrono (09h e 21h)
 # -------------------------------------------------
 async def scheduler():
+    global last_sent_date
+
     while True:
         now = datetime.now(TZ_BRASILIA)
-        current_time = now.strftime("%H:%M")
 
-        global last_sent_date
-
-        if current_time == "00:00" and last_sent_date != now.date():
-            print(f"[SCHEDULER] Envio programado {current_time}")
+        if now.hour == 0 and now.minute == 0 and last_sent_date != now.date():
+            print(f"[SCHEDULER] Envio enviado {current_time}")
             await send_daily_log()
             last_sent_date = now.date()
-            await asyncio.sleep(60)  # evita envio duplicado no mesmo minuto
+            await asyncio.sleep(70)  # evita envio duplicado no mesmo minuto
 
-        await asyncio.sleep(20)
+        await asyncio.sleep(15)
 
 # -------------------------------------------------
 # Execução principal (versão final)
