@@ -1,6 +1,6 @@
-﻿# VERSAO 1 Main CopiaGrupo - FUNCIONA LOCAL e WEB - 
-# Com LOG e envio diário as 9h e 21h 
-# novo main envia log meia noite (apenas) para corrigir erro no log q envia apenas as 9h
+﻿# VERSAO 2 Main CopiaGrupo BINANCE 
+# Com LOG e envio diário as 00h funcionando
+# T
 # Bruno Aguiar - MEXC com Taxa Zero
 
 #!/usr/bin/env python3
@@ -73,12 +73,11 @@ client = TelegramClient(
 # -------------------------------------------------
 # Cliente Binance
 # -------------------------------------------------
-binance = Client(
-    BINANCE_API_KEY,
-    BINANCE_API_SECRET
-)
-
-binance.futures_change_position_mode(dualSidePosition=True)
+def get_binance_client():
+    return Client(
+        BINANCE_API_KEY,
+        BINANCE_API_SECRET
+    )
 
 # ---------------------------------------------------
 # Extrai dados estruturados da mensagem do Telegram.
@@ -118,6 +117,7 @@ def parse_signal_message(text: str):
 # Função cria ordem Binance
 # -------------------------------------------------------------------------
 def create_binance_order(signal: dict):
+    binance = get_binance_client()
     symbol = signal["symbol"]
     signal_type = signal["signal"]
 
@@ -205,15 +205,13 @@ def create_binance_order(signal: dict):
 # Função que confirma se ordem foi criada na Binance
 # -------------------------------------------------------------------------
 def order_filled(order: dict) -> bool:
+    binance = get_binance_client()
     return order.get("status") in ("FILLED", "PARTIALLY_FILLED")
 # -------------------------------------------------------------------------
 # Função que cria TP 50%
 # -------------------------------------------------------------------------
 def create_take_profit_50(symbol, position_side, entry_price, qty):
-    """
-    Cria TP em 50% de lucro
-    """
-
+    binance = get_binance_client()
     TP_PERCENT = 0.50  # 50%
 
     if position_side == "LONG":
