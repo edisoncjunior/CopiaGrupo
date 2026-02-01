@@ -211,7 +211,8 @@ def create_binance_order(signal: dict):
             symbol=symbol,
             position_side=position_side,
             entry_price=entry_price,
-            qty=executed_qty
+            qty=executed_qty,
+            leverage=leverage
         )
 
 
@@ -247,9 +248,9 @@ def order_filled(order: dict) -> bool:
 # -------------------------------------------------------------------------
 # Função que cria TP 50%
 # -------------------------------------------------------------------------
-def create_take_profit_50(symbol, position_side, entry_price, qty):
+def create_take_profit_50(symbol, position_side, entry_price, qty, leverage):
     binance = get_binance_client()
-    TP_PERCENT = 0.50  # 50%
+    TP_PERCENT = 0.50  / leverage # 50%
 
     if position_side == "LONG":
         tp_price = round(entry_price * (1 + TP_PERCENT), 6)
