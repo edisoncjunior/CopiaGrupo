@@ -114,6 +114,32 @@ def parse_signal_message(text: str):
         "price": price
     }
 # -------------------------------------------------------------------------
+# Função que verifica se já possui uma posição na Binance
+# -------------------------------------------------------------------------
+def has_open_position(symbol: str, position_side: str) -> bool:
+    """
+    Retorna True se já existir posição aberta (qty != 0)
+    """
+    binance = get_binance_client()
+
+    try:
+        positions = binance.futures_position_information(symbol=symbol)
+
+        for pos in positions:
+            if (
+                pos["symbol"] == symbol
+                and pos["positionSide"] == position_side
+                and float(pos["positionAmt"]) != 0.0
+            ):
+                return True
+
+        return False
+
+    except BinanceAPIException as e:
+        print(f"[BINANCE][POSITION][ERRO] {e}")
+        return True  # segurança: assume que existe
+
+# -------------------------------------------------------------------------
 # Função cria ordem Binance
 # -------------------------------------------------------------------------
 def create_binance_order(signal: dict):
@@ -131,6 +157,16 @@ def create_binance_order(signal: dict):
     else:
         print("[BINANCE] Sinal não reconhecido")
         return
+    # ---------------------------------
+    # BLOQUEIO: posição já aberta
+    # ---------------------------------
+    if has_open_position(symbol, position_side):
+        print(
+            "[BINANCE][SKIP] Posição já aberta | "
+            f"Symbol={symbol} | Position={position_side}"
+        )
+        return
+
 
     # ---- CONFIGURAÇÕES FIXAS (AJUSTE SE QUISER) ----
     quantity = 10  # contratos
@@ -207,6 +243,7 @@ def create_binance_order(signal: dict):
 def order_filled(order: dict) -> bool:
     binance = get_binance_client()
     return order.get("status") in ("FILLED", "PARTIALLY_FILLED")
+
 # -------------------------------------------------------------------------
 # Função que cria TP 50%
 # -------------------------------------------------------------------------
