@@ -341,6 +341,10 @@ async def forward_message(event):
                 print(f"[SKIP] Moeda ignorada: {parsed['symbol']}")
                 return  # não envia para o Telegram
 
+            # -------- ENTRADA BINANCE --------
+            if parsed["exchange"] == "BINANCE":
+                print("[BINANCE] Criando ordem...")
+                create_binance_order(parsed)
         else:
             # mensagem não é sinal → ignora encaminhamento
             return
