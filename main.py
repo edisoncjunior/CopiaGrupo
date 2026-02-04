@@ -8,6 +8,8 @@ from datetime import datetime, timezone, timedelta
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 
+FILTER_SYMBOLS = False  # True = filtra | False = envia tudo
+
 # =================================================
 # CONFIGURAÇÕES GERAIS
 # =================================================
@@ -137,7 +139,8 @@ async def forward_message(event):
         write_log(parsed)
         print(f"[LOG] {parsed}")
 
-        if parsed["symbol"] not in ALLOWED_SYMBOLS:
+#        if parsed["symbol"] not in ALLOWED_SYMBOLS:
+        if FILTER_SYMBOLS and parsed["symbol"] not in ALLOWED_SYMBOLS:
             print(f"[SKIP] Moeda ignorada: {parsed['symbol']}")
             return
 
