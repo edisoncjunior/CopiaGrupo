@@ -1,11 +1,4 @@
-﻿# VERSAO 1 Main CopiaGrupo - FUNCIONA LOCAL e WEB - 
-# funcionando Local e Railway
-# Com LOG e envio diário as 00h 
-# Com teste lógico de moedas (False/True) [Tudo ou Bruno Aguiar - MEXC com Taxa Zero]
-# redução de moedas para teste rodar em railway
-# foi testado rodar na Binance - bloqueio pela exchange!
-
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import os
@@ -15,68 +8,71 @@ from datetime import datetime, timezone, timedelta
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 
+# =================================================
+# CONFIGURAÇÕES GERAIS
+# =================================================
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
+STATE_FILE = os.path.join(BASE_DIR, ".last_sent")
 
-#SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING")
 TZ_BRASILIA = timezone(timedelta(hours=-3))
-last_sent_date = None
 
-# -------------------------------------------------
-# Moedas permitidas para alerta
-# -------------------------------------------------
 ALLOWED_SYMBOLS = {
-#Lista dos ativos do Bruno Aguiar na MEXC com taxa zero:
-    "BCHUSDT", "BNBUSDT", "CHZUSDT", "DOGEUSDT", "ENAUSDT", "ETHUSDT",
-    "JASMYUSDT", "SOLUSDT", "UNIUSDT", "XMRUSDT", "XRPUSDT"
+    "BCHUSDT", "BNBUSDT", "CHZUSDT", "DOGEUSDT", "ENAUSDT",
+    "ETHUSDT", "JASMYUSDT", "SOLUSDT", "UNIUSDT", "XMRUSDT", "XRPUSDT"
 }
- 
-# -------------------------------------------------
-# Ambiente local → carrega .env (se existir)
-# Ambiente web  → ignora .env e usa env vars
-# -------------------------------------------------
+
+# =================================================
+# ENV (local / Railway)
+# =================================================
+
 try:
     from dotenv import load_dotenv
     if os.path.exists(".env"):
         load_dotenv()
-        print("[ENV] .env carregado (execução local)")
+        print("[ENV] .env carregado (local)")
     else:
         print("[ENV] execução web (Railway)")
 except ImportError:
-    # python-dotenv não instalado (Railway/GitHub)
-    print("[ENV] python-dotenv ausente (execução web)")
+    print("[ENV] python-dotenv ausente")
 
-# -------------------------------------------------
-# Variáveis de ambiente (obrigatórias)
-# -------------------------------------------------
-API_ID = int(os.environ["API_ID"])
-API_HASH = os.environ["API_HASH"]
-SOURCE_CHAT_ID = int(os.environ["SOURCE_CHAT_ID"])
-TARGET_CHAT_ID = int(os.environ["TARGET_CHAT_ID"])
-SESSION_STRING = os.environ["TELEGRAM_SESSION_STRING"]
+def get_env(name: str, cast=str, required=True):
+    value = os.environ.get(name)
+    if required and not value:
+        raise RuntimeError(f"Variável de ambiente ausente: {name}")
+    return cast(value) if value else None
 
-# -------------------------------------------------
-# Cliente Telegram
-# -------------------------------------------------
+API_ID = get_env("API_ID", int)
+API_HASH = get_env("API_HASH")
+SOURCE_CHAT_ID = get_env("SOURCE_CHAT_ID", int)
+TARGET_CHAT_ID = get_env("TARGET_CHAT_ID", int)
+SESSION_STRING = get_env("TELEGRAM_SESSION_STRING")
+
+# =================================================
+# CLIENTE TELEGRAM
+# =================================================
+
 client = TelegramClient(
     StringSession(SESSION_STRING),
     API_ID,
     API_HASH
 )
-# ---------------------------------------------------
-# Extrai dados estruturados da mensagem do Telegram.
-# Retorna dict ou None se não casar com o padrão.
-# ---------------------------------------------------
+
+target_peer = None  # resolvido no startup
+
+# =================================================
+# PARSER DE MENSAGEM
+# =================================================
+
 def parse_signal_message(text: str):
-    # Normaliza texto
     text = text.strip().replace("\r", "")
 
-    # Regex principal
     pattern = re.compile(
-        r'^(?P<exchange>\w+):(?P<symbol>\w+)\s+deu\s+'
-        r'(?P<signal>.+?)\s+nos?\s+'
-        r'(?P<time>\d+)\s+minutos?.*?\n+'
-        r'Preço:\s*(?P<price>[\d\.]+)',
+        r'(?P<exchange>\w+):(?P<symbol>\w+).*?'
+        r'(?P<signal>compra|venda).*?'
+        r'(?P<time>\d+)\s*minutos?.*?'
+        r'(Preço:?\s*(?P<price>[\d.,]+))?',
         re.IGNORECASE | re.DOTALL
     )
 
@@ -84,152 +80,152 @@ def parse_signal_message(text: str):
     if not match:
         return None
 
-    exchange = match.group("exchange").upper()
-    symbol = match.group("symbol").upper()
-    signal = match.group("signal").strip().lower()
-    timeframe = f'{match.group("time")} minutos'
-    price = match.group("price").replace(".", ",")
+    try:
+        price = float(match.group("price").replace(",", ".")) if match.group("price") else None
+    except ValueError:
+        price = None
 
     return {
-        "exchange": exchange,
-        "symbol": symbol,
-        "signal": signal,
-        "timeframe": timeframe,
+        "exchange": match.group("exchange").upper(),
+        "symbol": match.group("symbol").upper(),
+        "signal": match.group("signal").lower(),
+        "timeframe": f"{match.group('time')} minutos",
         "price": price
     }
 
-# -------------------------------------------------------------------------
-# Função que retorna a data
-# -------------------------------------------------------------------------
+# =================================================
+# LOG
+# =================================================
 
-def get_operational_date(now):
-    return now.date()
-
-# -------------------------------------------------
-# Função para gravar o log tabulado
-# -------------------------------------------------
 def write_log(data: dict):
     os.makedirs(LOG_DIR, exist_ok=True)
     now = datetime.now(TZ_BRASILIA)
 
-    operational_date = get_operational_date(now)
-    file_name = f"log_{operational_date.isoformat()}.txt"
+    file_name = f"log_{now.date().isoformat()}.txt"
     log_path = os.path.join(LOG_DIR, file_name)
 
     header = "Data\tHora\tExchange\tMoeda\tSinal\tGrafico\tPreco\n"
-    file_exists = os.path.exists(log_path)
-
-    data_str = now.strftime("%d/%m/%Y")
-    hora_str = now.strftime("%H:%M:%S")
+    exists = os.path.exists(log_path)
 
     with open(log_path, "a", encoding="utf-8") as f:
-        if not file_exists:
+        if not exists:
             f.write(header)
 
         f.write(
-            f"{data_str}\t"
-            f"{hora_str}\t"
+            f"{now.strftime('%d/%m/%Y')}\t"
+            f"{now.strftime('%H:%M:%S')}\t"
             f"{data['exchange']}\t"
             f"{data['symbol']}\t"
             f"{data['signal']}\t"
             f"{data['timeframe']}\t"
-            f"{data['price']}\n"
+            f"{data['price'] if data['price'] is not None else ''}\n"
         )
 
-# -------------------------------------------------
-# Listener de mensagens
-# -------------------------------------------------
+# =================================================
+# LISTENER
+# =================================================
+
 @client.on(events.NewMessage(chats=SOURCE_CHAT_ID))
 async def forward_message(event):
     try:
         text = event.message.text or ""
-
-        # -------- LOG --------
         parsed = parse_signal_message(text)
-        if parsed:
-            write_log(parsed)
-            print(f"[LOG] Registrado: {parsed}")
 
-            # -------- FILTRO DE MOEDAS --------
-            if parsed["symbol"] not in ALLOWED_SYMBOLS:
-                print(f"[SKIP] Moeda ignorada: {parsed['symbol']}")
-                return  # não envia para o Telegram
-
-        else:
-            # mensagem não é sinal → ignora encaminhamento
+        if not parsed:
             return
 
-        # -------- FORWARD --------
+        write_log(parsed)
+        print(f"[LOG] {parsed}")
+
+        if parsed["symbol"] not in ALLOWED_SYMBOLS:
+            print(f"[SKIP] Moeda ignorada: {parsed['symbol']}")
+            return
+
         if event.message.media:
             await client.send_file(
-                TARGET_CHAT_ID,
+                target_peer,
                 event.message.media,
                 caption=text
             )
         else:
             await client.send_message(
-                TARGET_CHAT_ID,
+                target_peer,
                 text
             )
 
         print(f"[FORWARD] Enviado: {parsed['symbol']}")
 
     except Exception as e:
-        print(f"Erro ao processar mensagem: {e}")
+        print(f"[ERRO] Handler: {e}")
 
-# -------------------------------------------------
-# Função para enviar o log para o Telegram
-# -------------------------------------------------
+# =================================================
+# LOG DIÁRIO
+# =================================================
+
+def get_last_sent_date():
+    if not os.path.exists(STATE_FILE):
+        return None
+    with open(STATE_FILE, "r") as f:
+        return f.read().strip()
+
+def set_last_sent_date(date_str):
+    with open(STATE_FILE, "w") as f:
+        f.write(date_str)
+
 async def send_daily_log():
     now = datetime.now(TZ_BRASILIA)
-
     log_date = now.date() - timedelta(days=1)
 
     file_name = f"log_{log_date.isoformat()}.txt"
     log_path = os.path.join(LOG_DIR, file_name)
 
     if not os.path.exists(log_path):
-        print(f"[LOG] Nenhum arquivo para enviar ({file_name})")
+        print("[LOG] Nenhum arquivo para envio")
         return
 
     caption = (
         f"📊 Log diário\n"
         f"Data: {log_date.strftime('%d/%m/%Y')}\n"
-        f"Horário envio: {now.strftime('%H:%M')}"
+        f"Envio: {now.strftime('%H:%M')}"
     )
 
-    await client.send_file(
-        TARGET_CHAT_ID,
-        log_path,
-        caption=caption
-    )
+    await client.send_file(target_peer, log_path, caption=caption)
+    set_last_sent_date(log_date.isoformat())
+    print("[LOG] Arquivo enviado")
 
-    print("[LOG] Arquivo enviado ao Telegram")
+# =================================================
+# SCHEDULER
+# =================================================
 
-
-# -------------------------------------------------
-# Scheduler assíncrono (00h)
-# -------------------------------------------------
 async def scheduler():
-    global last_sent_date
-
     while True:
         now = datetime.now(TZ_BRASILIA)
-# and last_sent_date != now.date():
-        if now.hour == 00 and now.minute == 0:
-            print(f"[SCHEDULER] Envio enviado {now}")
-            await send_daily_log()
-            last_sent_date = now.date()
-            await asyncio.sleep(70)  # evita envio duplicado no mesmo minuto
+        last_sent = get_last_sent_date()
+
+        if now.hour == 0 and now.minute == 0:
+            if last_sent != now.date().isoformat():
+                await send_daily_log()
+                await asyncio.sleep(70)
 
         await asyncio.sleep(15)
 
-# -------------------------------------------------
-# Execução principal (versão final)
-# -------------------------------------------------
+# =================================================
+# MAIN
+# =================================================
+
 async def main():
+    global target_peer
+
     print("Modo BOT: iniciado...")
-    await client.start()
+
+    await client.connect()
+
+    if not await client.is_user_authorized():
+        raise RuntimeError("Sessão Telegram inválida ou revogada")
+
+    target_peer = await client.get_entity(TARGET_CHAT_ID)
+    print("[INIT] Peer de destino resolvido")
+
     asyncio.create_task(scheduler())
     await client.run_until_disconnected()
 
