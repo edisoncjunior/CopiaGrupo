@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 
-FILTER_SYMBOLS = False  # True = filtra | False = envia tudo
+FILTER_SYMBOLS = True  # True = filtra | False = envia tudo
 
 # =================================================
 # CONFIGURAÇÕES GERAIS
